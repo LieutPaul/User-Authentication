@@ -26,65 +26,55 @@ app.get('/users', (req, res) => {
 });
 
 // API Route to create a user
-app.post('/users', async (req, res) => {
-    
-    try{
-        // Adding user to list of users
-        const hashedPassword = await bcrypt.hash(req.body.password,10) //Hashing the password with 10 salt rounds
-        const user = new User({ 
-            name: req.body.name, 
-            username:req.body.username, 
-            password: hashedPassword 
-        });
-        console.log(user);
-        User.find({username:req.body.username},(err,result)=>{
-            if(err){
-                console.log(err);
-            }else{
-                if(result.length !== 0){
-                    return res.status(400).send('User already exists.');
-                }else{
-                    user.save((err, res) => {
-                        if(err){
-                            console.log(err);
-                        }else{
-                            res.status(201).send();
-                        }
-                        
-                    });
-                }
-            }
-        })
-    }catch{
-        res.status(500).send();
-    }
-});
-
-// API Route to try to login a user
-app.post('/users/login', async (req, res) => {
+app.post('/register', async (req, res) => {
+    // Adding user to list of users
+    const hashedPassword = await bcrypt.hash(req.body.password,10) //Hashing the password with 10 salt rounds
+    const user = new User({ 
+        name: req.body.name, 
+        username:req.body.username, 
+        password: hashedPassword 
+    });
+    console.log(user);
     User.find({username:req.body.username},(err,result)=>{
         if(err){
             console.log(err);
         }else{
-            if(result){
-                try{
-                    if(bcrypt.compare(req.body.password, user.password)) { //Comparing the password of user and entered password
-                        res.send('Success')
-                    } else {
-                        res.send('Wrong Password')
-                    }
-                }catch{
-                    res.status(500).send()
-                }
+            if(result.length !== 0){
+                res.status(400).send('User already exists.');
             }else{
-                user.save((err, res) => {
+                user.save((err, result) => {
                     if(err){
                         console.log(err);
                     }else{
-                        res.status(201).send()
+                        res.status(201).send("User Added");
                     }
                     
                 });
+            }
+        }
+    })
+    
+});
+
+// API Route to try to login a user
+app.post('/login', async (req, res) => {
+    User.findOne({username:req.body.username},(err,user)=>{
+        if(err){
+            console.log(err);
+        }else{
+            if(user){ //Comparing passwords
+                bcrypt.compare(req.body.password, user.password, (err, data) => {
+                    if(err){
+                        console.log(err);
+                    }
+                    if(data){
+                        return res.status(200).send("Successful Login")
+                    } else {
+                        return res.status(401).send("Wrong Password")
+                    }
+                });
+            }else{
+                res.status(404).send("User does not exist.")
             }
         }
     })
