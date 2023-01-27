@@ -1,47 +1,94 @@
 const express = require('express')
 const app = express()
 const bcrypt = require('bcrypt')
+const mongoose=require('mongoose');
+mongoose.set('strictQuery', false);
+mongoose.connect("mongodb://localhost:27017/userAuthenticationDB",{useNewURLParser:true});
+
+const UserSchema = new mongoose.Schema({
+    name : String,
+    username : String,
+    password : String,
+});
+const User = mongoose.model("User",UserSchema);
 
 app.use(express.json())
 
-const users = []
-
 app.get('/users', (req, res) => {
-    res.json(users) //Get all registered Users
+    //Get all registered Users
+    User.find({},(err,result)=>{
+        if(err){
+            console.log(err);
+        }else{
+            res.send(result);
+        }
+    })
 });
 
 // API Route to create a user
 app.post('/users', async (req, res) => {
+    
     try{
+        // Adding user to list of users
         const hashedPassword = await bcrypt.hash(req.body.password,10) //Hashing the password with 10 salt rounds
-        const user = { name: req.body.name, password: hashedPassword }
-        users.push(user) // Adding user to list of users
-        res.status(201).send()
+        const user = new User({ 
+            name: req.body.name, 
+            username:req.body.username, 
+            password: hashedPassword 
+        });
+        console.log(user);
+        User.find({username:req.body.username},(err,result)=>{
+            if(err){
+                console.log(err);
+            }else{
+                if(result.length !== 0){
+                    return res.status(400).send('User already exists.');
+                }else{
+                    user.save((err, res) => {
+                        if(err){
+                            console.log(err);
+                        }else{
+                            res.status(201).send();
+                        }
+                        
+                    });
+                }
+            }
+        })
     }catch{
-        res.status(500).send()
+        res.status(500).send();
     }
 });
 
 // API Route to try to login a user
 app.post('/users/login', async (req, res) => {
-    let user = null;
-    for(var i=0;i<users.length;i++){ //Finding the username
-        if(users[i].name===req.body.name){
-            user = users[i];
+    User.find({username:req.body.username},(err,result)=>{
+        if(err){
+            console.log(err);
+        }else{
+            if(result){
+                try{
+                    if(bcrypt.compare(req.body.password, user.password)) { //Comparing the password of user and entered password
+                        res.send('Success')
+                    } else {
+                        res.send('Wrong Password')
+                    }
+                }catch{
+                    res.status(500).send()
+                }
+            }else{
+                user.save((err, res) => {
+                    if(err){
+                        console.log(err);
+                    }else{
+                        res.status(201).send()
+                    }
+                    
+                });
+            }
         }
-    }
-    if(user==null){
-        return res.status(400).send('Cannot find user') //User doesn't exist
-    }
-    try{
-        if(await bcrypt.compare(req.body.password, user.password)) { //Comparing the password of user and entered password
-            res.send('Success')
-        } else {
-            res.send('Wrong Password')
-        }
-    }catch{
-        res.status(500).send()
-    }
+    })
+    
 });
 
 app.listen(3000, ()=>{
